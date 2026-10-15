@@ -57,7 +57,11 @@ def _load_dotenv(path=None):
                 os.environ[key] = val
 
 
+# Load order (first one to set a key wins): shell exports, then a .env in this
+# folder, then ~/.config/jarvis/.env. Keep your real keys in the ~/.config one —
+# it lives outside the project, so re-downloading or re-cloning never wipes it.
 _load_dotenv()
+_load_dotenv(os.path.expanduser("~/.config/jarvis/.env"))
 
 # ---------------------------------------------------------------- config -----
 MODEL = "claude-sonnet-5"          # default; switchable from the UI
