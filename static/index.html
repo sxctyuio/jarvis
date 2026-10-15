@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --line:#262b36; --text:#e6e9ef;
+    --muted:#8b93a3; --accent:#7c9cff; --term-bg:#0b0d12;
+    --shell:#4ec9b0; --duck:#e3b341; --browser:#7c9cff;
+    --gmail:#ff8a80; --calendar:#82b1ff; --github:#d0d0d0; --news:#b39ddb;
+    --weather:#80cbc4; --spotify:#69f0ae; --web:#7c9cff;
+    --ok:#3fb950; --no:#f85149;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.5 system-ui,-apple-system,sans-serif;height:100vh;overflow:hidden;}
+
+  .app{display:flex;height:100vh;}
+  .left{display:flex;flex-direction:column;flex:1;min-width:0;}
+  .right{width:0;transition:width .22s ease;border-left:1px solid var(--line);
+    background:var(--panel);display:flex;flex-direction:column;overflow:hidden;}
+  .right.open{width:46%;}
+  @media(max-width:900px){ .right.open{width:100%;position:absolute;right:0;top:0;bottom:0;z-index:20;} }
+
+  header{padding:12px 18px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:12px;}
+  header h1{font-size:15px;margin:0;font-weight:600;}
+  header .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
+  .spacer{margin-left:auto;}
+  .toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);}
+  header button{background:none;border:1px solid var(--line);color:var(--muted);
+    padding:5px 10px;border-radius:6px;cursor:pointer;}
+  .conn{display:flex;gap:6px;align-items:center;}
+  .conn button.on{color:var(--ok);border-color:#1c3a22;}
+
+  #log{flex:1;overflow-y:auto;padding:18px;}
+  #log>div{margin:10px 0;max-width:820px;}
+  .role{font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .bubble{padding:10px 14px;border-radius:10px;white-space:normal;}
+  .text-you .bubble{background:#1b2436;white-space:pre-wrap;}
+  .text-claude .bubble{background:var(--panel);}
+  .bubble p{margin:0 0 8px;} .bubble p:last-child{margin-bottom:0;}
+  .bubble ul,.bubble ol{margin:6px 0;padding-left:22px;}
+  .bubble h1,.bubble h2,.bubble h3{margin:12px 0 6px;font-size:15px;}
+  .bubble a{color:var(--accent);}
+  .bubble code:not(pre code){background:#0b0d12;padding:1px 5px;border-radius:4px;
+    font-family:ui-monospace,monospace;font-size:13px;}
+
+  .codewrap{position:relative;margin:8px 0;border:1px solid var(--line);
+    border-radius:8px;overflow:hidden;}
+  .codewrap .codebar{display:flex;justify-content:space-between;align-items:center;
+    background:#0b0d12;padding:4px 10px;font-size:11px;color:var(--muted);
+    font-family:ui-monospace,monospace;border-bottom:1px solid var(--line);}
+  .codewrap pre{margin:0;padding:12px;overflow-x:auto;background:#0b0d12;}
+  .codewrap code{font-family:ui-monospace,monospace;font-size:13px;}
+  .copybtn{background:none;border:1px solid var(--line);color:var(--muted);
+    padding:2px 8px;border-radius:5px;cursor:pointer;font-size:11px;}
+  .copybtn:hover{color:var(--text);border-color:var(--muted);}
+  .copybtn.copied{color:var(--ok);border-color:#1c3a22;}
+
+  .artchip{display:inline-flex;align-items:center;gap:8px;margin:8px 0;
+    padding:10px 14px;border:1px solid var(--accent);border-radius:10px;
+    background:#0e1630;cursor:pointer;max-width:420px;}
+  .artchip:hover{background:#12204a;}
+  .artchip .aicon{font-size:16px;}
+  .artchip .atitle{color:var(--accent);font-weight:600;font-size:13px;}
+  .artchip .ameta{color:var(--muted);font-size:11px;}
+
+  .right .phead{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px;border-bottom:1px solid var(--line);}
+  .right .ptitle{font-size:13px;font-weight:600;color:var(--accent);}
+  .right .pbtns{display:flex;gap:6px;}
+  .right .pbody{flex:1;overflow:auto;padding:14px;}
+  .right pre{margin:0;background:var(--term-bg);padding:12px;border-radius:8px;overflow:auto;}
+  .right code{font-family:ui-monospace,monospace;font-size:13px;}
+  .arttabs{display:flex;gap:4px;padding:6px 10px;border-bottom:1px solid var(--line);
+    overflow-x:auto;}
+  .arttab{padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+    color:var(--muted);border:1px solid var(--line);white-space:nowrap;}
+  .arttab.active{color:var(--accent);border-color:var(--accent);background:#0e1630;}
+
+  .action{background:var(--term-bg);border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;font-family:ui-monospace,monospace;}
+  .action .cmd{padding:8px 12px;border-bottom:1px solid var(--line);
+    display:flex;gap:8px;align-items:center;}
+  .badge{font-size:11px;padding:1px 7px;border-radius:20px;font-weight:600;}
+  .badge.shell{background:#123;color:var(--shell);}
+  .badge.duck{background:#221a05;color:var(--duck);}
+  .badge.browser{background:#0e1630;color:var(--browser);}
+  .badge.gmail{background:#2a1410;color:var(--gmail);}
+  .badge.calendar{background:#101f2a;color:var(--calendar);}
+  .badge.github{background:#1a1a1a;color:var(--github);}
+  .badge.news{background:#1a1425;color:var(--news);}
+  .badge.weather{background:#0e2420;color:var(--weather);}
+  .badge.spotify{background:#0e2410;color:var(--spotify);}
+  .badge.web{background:#111c2e;color:var(--web);}
+  .action .cmdtext{color:var(--accent);}
+  .action .out{padding:8px 12px;color:var(--shell);white-space:pre-wrap;font-size:13px;}
+  .action img{max-width:100%;display:block;}
+
+  #approval{display:none;margin:10px 18px;padding:14px;border-radius:10px;
+    background:#1c1608;border:1px solid #4d3c12;}
+  #approval .q{color:#e3b341;margin-bottom:8px;}
+  #approval code{display:block;background:var(--term-bg);padding:10px;border-radius:6px;
+    color:var(--accent);margin-bottom:10px;white-space:pre-wrap;font-family:ui-monospace,monospace;}
+  #approval button{border:none;padding:7px 16px;border-radius:6px;cursor:pointer;
+    font-weight:600;margin-right:8px;}
+  #approval .approve{background:var(--ok);color:#04140a;}
+  #approval .deny{background:var(--no);color:#1a0505;}
+  footer{padding:14px 18px;border-top:1px solid var(--line);}
+  #msg{width:100%;padding:12px 14px;font-size:15px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--line);color:var(--text);}
+  #msg:disabled{opacity:.5;}
+  .thinking{color:var(--muted);font-style:italic;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="left">
+    <header>
+      <span class="dot"></span>
+      <input id="namein" value="Jarvis" onchange="saveName(this.value)"
+        title="Click to rename your assistant"
+        style="background:none;border:1px solid transparent;color:var(--text);font-size:15px;font-weight:600;width:90px;border-radius:6px;padding:2px 6px;"
+        onmouseover="this.style.borderColor='var(--line)'" onmouseout="this.style.borderColor='transparent'">
+      <div class="spacer"></div>
+      <select id="modelsel" onchange="setModel(this.value)" title="Switch model"
+        style="background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:13px;cursor:pointer;">
+      </select>
+      <div class="conn">
+        <button id="conn-google" onclick="connect('google')" title="Connect Gmail + Calendar">Connect Google</button>
+        <button id="conn-spotify" onclick="connect('spotify')" title="Connect Spotify">Connect Spotify</button>
+        <input type="file" id="chatfiles" multiple accept=".txt,.md,.json" style="display:none" onchange="uploadChats(this.files)">
+        <button onclick="document.getElementById('chatfiles').click()" title="Upload transcripts into memory">Import chats</button>
+        <button onclick="trimMemory()" title="Shrink memory to keep it fast">Trim memory</button>
+      </div>
+      <label class="toggle" title="Off = clean browser. On = your logged-in Chrome profile.">
+        <input type="checkbox" id="acct" onchange="setProfile(this.checked)">
+        <span>use my account</span>
+      </label>
+      <button onclick="resetChat()">Reset</button>
+    </header>
+
+    <div id="log"></div>
+
+    <div id="approval">
+      <div class="q" id="approval-q">Approve this action?</div>
+      <code id="approval-cmd"></code>
+      <button class="approve" onclick="decide('approve')">Approve</button>
+      <button class="deny" onclick="decide('deny')">Deny</button>
+    </div>
+
+    <footer>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <button id="wakebtn" onclick="toggleWake()" title="Listen continuously for the wake word"
+          style="border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">😴 wake word off</button>
+        <input id="wakeword" value="jarvis" placeholder="wake word" title="Say this word to activate" onchange="setWakeWord(this.value)"
+          style="width:120px;padding:6px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:13px;">
+        <span id="wakestatus" style="color:var(--muted);font-size:12px;"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button id="micbtn" onclick="toggleMic()" title="Click to talk once"
+          style="border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:16px;">🎤</button>
+        <button id="spkbtn" onclick="toggleSpeak()" title="Jarvis speaks replies aloud"
+          style="border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:16px;">🔈</button>
+        <select id="voicesel" onchange="onVoicePick(this.value)" title="Pick a Fish voice"
+          style="background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 8px;font-size:13px;cursor:pointer;max-width:150px;">
+        </select>
+        <input id="voiceid" placeholder="paste voice ID" onchange="setFishVoice(this.value)"
+          title="Paste a reference_id from fish.audio for a specific voice"
+          style="width:120px;padding:9px 8px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:12px;">
+        <span style="color:var(--muted);font-size:12px;">speed</span>
+        <input id="speed" type="range" min="0.5" max="2" step="0.1" value="1"
+          onchange="setSpeed(this.value)" title="Speech speed" style="width:80px;">
+        <span id="speedval" style="color:var(--muted);font-size:12px;">1.0×</span>
+        <input id="msg" placeholder="ask Jarvis — Mac, duck, or the web..." autofocus style="flex:1;min-width:180px;">
+      </div>
+    </footer>
+  </div>
+
+  <div class="right" id="rightpanel">
+    <div class="phead">
+      <span class="ptitle" id="art-title">Artifact</span>
+      <div class="pbtns">
+        <button class="copybtn" id="art-copy" onclick="copyCurrentArtifact(event)">Copy</button>
+        <button class="copybtn" onclick="closePanel()">Close ✕</button>
+      </div>
+    </div>
+    <div class="arttabs" id="art-tabs"></div>
+    <div class="pbody" id="art-body"></div>
+  </div>
+</div>
+
+<script>
+const log=document.getElementById("log"), msg=document.getElementById("msg");
+const approval=document.getElementById("approval");
+const approvalCmd=document.getElementById("approval-cmd");
+const approvalQ=document.getElementById("approval-q");
+const rightPanel=document.getElementById("rightpanel");
+let pendingId=null;
+
+const artifacts=[];
+let currentArtifact=null;
+let assistantName="Jarvis";
+
+function el(cls,html){const d=document.createElement("div");d.className=cls;d.innerHTML=html;
+  log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function addYou(t){el("text-you",`<div class="role">you</div><div class="bubble">${esc(t)}</div>`);}
+
+function addClaude(t){
+  const node=el("text-claude",`<div class="role">${assistantName.toLowerCase()}</div><div class="bubble"></div>`);
+  const bubble=node.querySelector(".bubble");
+  let html; try{ html=marked.parse(t||"",{breaks:true}); }catch(_){ html=esc(t||""); }
+  bubble.innerHTML=html;
+  enhanceCode(bubble);
+  log.scrollTop=log.scrollHeight;
+  return node;
+}
+
+function enhanceCode(root){
+  root.querySelectorAll("pre > code").forEach(code=>{
+    const pre=code.parentElement;
+    const raw=code.textContent;
+    const lang=(code.className.match(/language-(\w+)/)||[])[1]||"code";
+    const lines=raw.split("\n").length;
+
+    if(lines>15){
+      const art=addArtifact(lang, raw);
+      const chip=document.createElement("div");
+      chip.className="artchip";
+      chip.innerHTML=`<span class="aicon">\uD83D\uDCC4</span>`
+        +`<span class="atitle">${art.title}</span>`
+        +`<span class="ameta">${lang} \u00B7 ${lines} lines \u00B7 click to open</span>`;
+      chip.onclick=()=>openArtifact(art.id);
+      pre.replaceWith(chip);
+    }else{
+      try{ hljs.highlightElement(code); }catch(_){}
+      const wrap=document.createElement("div");
+      wrap.className="codewrap";
+      wrap.innerHTML=`<div class="codebar"><span>${lang}</span><button class="copybtn">Copy</button></div>`;
+      wrap.querySelector(".copybtn").onclick=(e)=>copyText(raw,e.target);
+      pre.replaceWith(wrap); wrap.appendChild(pre);
+    }
+  });
+}
+
+function addArtifact(lang, code){
+  const id="art"+artifacts.length;
+  const title=(lang==="code"?"Artifact ":lang+" ")+(artifacts.length+1);
+  const art={id,title,lang,code};
+  artifacts.push(art);
+  return art;
+}
+
+function openArtifact(id){
+  currentArtifact=artifacts.find(a=>a.id===id);
+  if(!currentArtifact) return;
+  rightPanel.classList.add("open");
+  document.getElementById("art-title").textContent=currentArtifact.title;
+  const body=document.getElementById("art-body");
+  const pre=document.createElement("pre");
+  const code=document.createElement("code");
+  code.className="language-"+currentArtifact.lang;
+  code.textContent=currentArtifact.code;
+  pre.appendChild(code); body.innerHTML=""; body.appendChild(pre);
+  try{ hljs.highlightElement(code); }catch(_){}
+  renderTabs();
+}
+
+function renderTabs(){
+  const tabs=document.getElementById("art-tabs");
+  tabs.innerHTML="";
+  artifacts.forEach(a=>{
+    const t=document.createElement("div");
+    t.className="arttab"+(currentArtifact&&a.id===currentArtifact.id?" active":"");
+    t.textContent=a.title;
+    t.onclick=()=>openArtifact(a.id);
+    tabs.appendChild(t);
+  });
+}
+
+function closePanel(){ rightPanel.classList.remove("open"); }
+function copyCurrentArtifact(e){ if(currentArtifact) copyText(currentArtifact.code, e.target); }
+
+function copyText(text,btn){
+  navigator.clipboard.writeText(text).then(()=>{
+    const old=btn.textContent; btn.textContent="Copied"; btn.classList.add("copied");
+    setTimeout(()=>{btn.textContent=old;btn.classList.remove("copied");},1200);
+  });
+}
+
+function addAction(tool,detail,output){
+  const isShot=/\/static\/shot\.png/.test(output);
+  const body=isShot?`<img src="/static/shot.png?t=${Date.now()}">`:esc(output);
+  el("action",`<div class="cmd"><span class="badge ${tool}">${tool}</span>`
+    +`<span class="cmdtext">${esc(detail)}</span></div><div class="out">${body}</div>`);
+}
+
+async function pollPending(){
+  try{const d=await (await fetch("/pending")).json();
+    if(d.id&&d.id!==pendingId){pendingId=d.id;
+      approvalQ.textContent=d.label||"Approve this action?";
+      approvalCmd.textContent=d.detail;approval.style.display="block";}
+  }catch(_){}
+}
+let poller=null;
+
+async function decide(decision){
+  approval.style.display="none";
+  await fetch("/decide",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:pendingId,decision})});
+  pendingId=null;
+}
+async function setProfile(useAccount){
+  const d=await (await fetch("/browser_profile",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({account:useAccount})})).json();
+  document.getElementById("acct").checked=d.account;
+}
+async function refreshConnections(){
+  try{const c=await (await fetch("/connections")).json();
+    const g=document.getElementById("conn-google");
+    if(c.google.connected){g.textContent="Google \u2713";g.classList.add("on");}
+    else if(!c.google.configured){g.textContent="Google (setup needed)";}
+    const s=document.getElementById("conn-spotify");
+    if(c.spotify.connected){s.textContent="Spotify \u2713";s.classList.add("on");}
+    else if(!c.spotify.configured){s.textContent="Spotify (setup needed)";}
+  }catch(_){}
+}
+async function connect(service){
+  const btn=document.getElementById("conn-"+service);
+  const old=btn.textContent;btn.textContent="opening...";
+  try{const r=await (await fetch("/connect/"+service,{method:"POST"})).json();addClaude(r.result);}
+  catch(e){addClaude("connect error: "+e.message);}
+  refreshConnections();
+}
+refreshConnections();
+
+async function loadModels(){
+  try{
+    const d=await (await fetch("/model")).json();
+    const sel=document.getElementById("modelsel");
+    sel.innerHTML="";
+    for(const [id,label] of Object.entries(d.options)){
+      const o=document.createElement("option");
+      o.value=id; o.textContent=label;
+      if(id===d.current) o.selected=true;
+      sel.appendChild(o);
+    }
+  }catch(_){}
+}
+async function setModel(m){
+  try{ await fetch("/model",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:m})}); }catch(_){}
+}
+loadModels();
+
+async function loadName(){
+  try{
+    const d=await (await fetch("/name")).json();
+    assistantName=d.name;
+    document.getElementById("namein").value=d.name;
+    document.title=d.name;
+    document.getElementById("msg").placeholder=`ask ${d.name} — Mac, duck, or the web...`;
+  }catch(_){}
+}
+async function saveName(n){
+  n=(n||"").trim(); if(!n) return;
+  try{
+    const d=await (await fetch("/name",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:n})})).json();
+    assistantName=d.name;
+    document.getElementById("namein").value=d.name;
+    document.title=d.name;
+    document.getElementById("msg").placeholder=`ask ${d.name} — Mac, duck, or the web...`;
+    if(document.getElementById("wakeword").value.toLowerCase()==="jarvis")
+      document.getElementById("wakeword").value=d.name.toLowerCase(); setWakeWord(d.name.toLowerCase());
+  }catch(_){}
+}
+loadName();
+
+async function loadVoices(){
+  try{
+    const d=await (await fetch("/fish_voices")).json();
+    const sel=document.getElementById("voicesel");
+    sel.innerHTML="";
+    for(const [name,id] of Object.entries(d.presets)){
+      const o=document.createElement("option");
+      o.value=id; o.textContent=name;
+      if(id===d.current_voice) o.selected=true;
+      sel.appendChild(o);
+    }
+    // reflect current speed
+    document.getElementById("speed").value=d.current_speed;
+    document.getElementById("speedval").textContent=Number(d.current_speed).toFixed(1)+"×";
+    if(d.current_voice) document.getElementById("voiceid").value=d.current_voice;
+  }catch(_){}
+}
+function onVoicePick(id){ setFishVoice(id); document.getElementById("voiceid").value=id; }
+async function setFishVoice(id){
+  try{ await fetch("/fish_voice",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({reference_id:id})}); }catch(_){}
+}
+async function setSpeed(v){
+  document.getElementById("speedval").textContent=Number(v).toFixed(1)+"×";
+  try{ await fetch("/fish_voice",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({speed:v})}); }catch(_){}
+}
+loadVoices();
+
+async function trimMemory(){
+  addClaude("Trimming memory to keep it fast...");
+  try{
+    const r=await (await fetch("/memory/trim",{method:"POST"})).json();
+    addClaude(r.result);
+  }catch(e){addClaude("trim error: "+e.message);}
+}
+
+async function uploadChats(fileList){
+  if(!fileList||!fileList.length) return;
+  addClaude(`Uploading ${fileList.length} file(s) into memory...`);
+  const fd=new FormData();
+  for(const f of fileList) fd.append("files",f);
+  try{const r=await (await fetch("/memory/upload",{method:"POST",body:fd})).json();addClaude(r.result);}
+  catch(e){addClaude("upload error: "+e.message);}
+  document.getElementById("chatfiles").value="";
+}
+
+async function resetChat(){await fetch("/reset",{method:"POST"});log.innerHTML="";
+  artifacts.length=0;currentArtifact=null;closePanel();}
+
+async function send(text){
+  addYou(text);msg.value="";msg.disabled=true;
+  const thinking=el("thinking","jarvis is working...");
+  poller=setInterval(pollPending,400);
+  try{
+    const items=await (await fetch("/chat",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:text})})).json();
+    thinking.remove();
+    for(const it of items){
+      if(it.type==="text"){ addClaude(it.text); speakText(it.text); }
+      else if(it.type==="action") addAction(it.tool,it.detail,it.output);
+    }
+  }catch(e){thinking.textContent="error: "+e.message;}
+  finally{clearInterval(poller);approval.style.display="none";pendingId=null;
+    msg.disabled=false;msg.focus();}
+}
+
+// ---- Voice: speech input (browser) + spoken replies ----
+let speakOn=true;   // voice on by default
+let recog=null, listening=false;
+
+function applySpeakBtn(){
+  const b=document.getElementById("spkbtn");
+  b.style.color=speakOn?"var(--ok)":"var(--muted)";
+  b.textContent=speakOn?"🔊":"🔈";
+}
+function toggleSpeak(){
+  speakOn=!speakOn;
+  applySpeakBtn();
+  fetch("/voice_reply",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({on:speakOn})}).catch(()=>{});
+}
+applySpeakBtn();   // reflect the default-on state when the page loads
+
+// One reused audio element (created on first user gesture so the browser
+// "unlocks" it and keeps it unlocked for later programmatic .play() calls).
+let _audioEl=null;
+let _speakQueue=Promise.resolve();   // serialize so replies don't overlap
+
+function _ensureAudio(){
+  if(!_audioEl){ _audioEl=new Audio(); _audioEl.autoplay=false; }
+  return _audioEl;
+}
+// unlock audio on the first click/key anywhere (satisfies autoplay policy)
+function _unlockAudio(){
+  const a=_ensureAudio();
+  a.src="data:audio/mp3;base64,//uQx"; // tiny no-op
+  a.play().catch(()=>{});              // primes the element; ignore failure
+  window.removeEventListener("click",_unlockAudio);
+  window.removeEventListener("keydown",_unlockAudio);
+}
+window.addEventListener("click",_unlockAudio);
+window.addEventListener("keydown",_unlockAudio);
+
+function speakText(text){
+  if(!speakOn||!text) return;
+  // chain onto the queue so each reply finishes before the next starts
+  _speakQueue=_speakQueue.then(()=>_speakOne(text)).catch(()=>{});
+}
+
+async function _speakOne(text){
+  let url=null;
+  try{
+    const r=await fetch("/speak",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text})});
+    if(!r.ok){ try{const e=await r.json(); console.warn("TTS:",e.error);}catch(_){} return; }
+    const blob=await r.blob();
+    url=URL.createObjectURL(blob);
+    const a=_ensureAudio();
+    a.src=url;
+    await new Promise((resolve)=>{
+      a.onended=resolve; a.onerror=resolve;
+      a.play().catch(err=>{ console.warn("play blocked:",err); resolve(); });
+    });
+  }catch(e){ console.warn("speak error",e); }
+  finally{ if(url) URL.revokeObjectURL(url); }
+}
+
+function toggleMic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ addClaude("Speech input isn't supported in this browser — try Chrome."); return; }
+  if(listening){ recog && recog.stop(); return; }
+  recog=new SR();
+  recog.lang="en-US"; recog.interimResults=false; recog.maxAlternatives=1;
+  const b=document.getElementById("micbtn");
+  recog.onstart=()=>{listening=true;b.style.color="var(--no)";b.textContent="🔴";};
+  recog.onend=()=>{listening=false;b.style.color="var(--muted)";b.textContent="🎤";};
+  recog.onerror=(e)=>{listening=false;b.style.color="var(--muted)";b.textContent="🎤";
+    if(e.error==="not-allowed") addClaude("Mic permission denied — allow it in the browser.");};
+  recog.onresult=(e)=>{
+    const said=e.results[0][0].transcript;
+    if(said && said.trim()) send(said.trim());   // speak -> send as a message
+  };
+  recog.start();
+}
+
+// ---- Wake word: continuous listening that triggers on a keyword ----
+// ---- Wake word: runs on the SERVER (Vosk + your Mac's mic) — always on ----
+let wakeOn=false, lastVoiceId=0;
+
+function wakeStatus(t){ document.getElementById("wakestatus").textContent=t; }
+function applyWakeBtn(){
+  const b=document.getElementById("wakebtn");
+  b.textContent=wakeOn?"👂 always listening":"😴 wake word off";
+  b.style.color=wakeOn?"var(--ok)":"var(--muted)";
+  b.style.borderColor=wakeOn?"#1c3a22":"var(--line)";
+}
+async function toggleWake(){
+  const word=(document.getElementById("wakeword").value||"jarvis").trim();
+  try{
+    const r=await fetch(wakeOn?"/wake/stop":"/wake/start",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({word})});
+    const d=await r.json(); wakeOn=d.running; applyWakeBtn(); showWake(d);
+  }catch(e){ addClaude("wake word error: "+e.message); }
+}
+async function setWakeWord(w){
+  try{ await fetch("/wake/config",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({word:w})}); }catch(_){}
+}
+function showWake(d){
+  if(d.running) wakeStatus("· "+d.status+(d.heard?" — heard: "+d.heard.slice(-40):""));
+  else wakeStatus(d.status && d.status!=="off" ? "· "+d.status : "");
+}
+async function pollWake(){
+  try{ const d=await (await fetch("/wake/status")).json();
+    wakeOn=d.running; applyWakeBtn(); showWake(d); }catch(_){}
+}
+async function pollVoiceEvents(){
+  try{
+    const d=await (await fetch("/voice_events?after="+lastVoiceId)).json();
+    for(const ev of d.events){
+      lastVoiceId=Math.max(lastVoiceId,ev.id);
+      addYou("🎙 "+ev.user);
+      for(const it of ev.items){   // server already spoke the reply
+        if(it.type==="text") addClaude(it.text);
+        else if(it.type==="action") addAction(it.tool,it.detail,it.output);
+      }
+    }
+  }catch(_){}
+}
+// skip old events on page load, then poll every second
+(async()=>{
+  try{ const d=await (await fetch("/voice_events?after=0")).json();
+    for(const ev of d.events) lastVoiceId=Math.max(lastVoiceId,ev.id); }catch(_){}
+  setInterval(()=>{ pollWake(); pollVoiceEvents(); pollPending(); },1000);
+})();
+
+msg.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&msg.value.trim()&&!msg.disabled) send(msg.value.trim());});
+</script>
+</body>
+</html>

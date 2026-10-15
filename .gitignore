@@ -1,0 +1,11 @@
+.env
+client_secret.json
+token_google.json
+token_spotify.json
+venv/
+__pycache__/
+static/shot.png
+.jarvis-chrome-profile/
+memory_store.json
+imported_chats/
+vosk-model/
